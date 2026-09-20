@@ -13,6 +13,19 @@ async function isAdmin(ctx) {
     return false;
   }
 
+  // Anonymous Administrator
+  if (
+    ctx.message?.sender_chat &&
+    String(ctx.message.sender_chat.id) === String(ctx.chat.id)
+  ) {
+    return true;
+  }
+
+  // Normal Administrator
+  if (!ctx.from?.id) {
+    return false;
+  }
+
   try {
     const member = await ctx.telegram.getChatMember(
       ctx.chat.id,
