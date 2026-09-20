@@ -605,6 +605,90 @@ function setupCommands(bot) {
     );
   });
 
+     /* =======================================
+     UNMUTE / UNBLOCK USER
+  ======================================= */
+
+  bot.command("unmute", async (ctx) => {
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply("❌ Admin only.");
+    }
+
+    if (
+      !ctx.message.reply_to_message ||
+      !ctx.message.reply_to_message.from
+    ) {
+      return ctx.reply(
+        "↩️ Muted user ke message ko reply karke:\n\n" +
+        "/unmute"
+      );
+    }
+
+    const user =
+      ctx.message.reply_to_message.from;
+
+    try {
+
+      // Get group's default permissions
+      const chat =
+        await ctx.telegram.getChat(
+          ctx.chat.id
+        );
+
+      const permissions =
+        chat.permissions || {
+          can_send_messages: true,
+          can_send_audios: true,
+          can_send_documents: true,
+          can_send_photos: true,
+          can_send_videos: true,
+          can_send_video_notes: true,
+          can_send_voice_notes: true,
+          can_send_polls: true,
+          can_send_other_messages: true,
+          can_add_web_page_previews: true,
+          can_change_info: false,
+          can_invite_users: true,
+          can_pin_messages: false
+        };
+
+      await ctx.telegram.restrictChatMember(
+        ctx.chat.id,
+        user.id,
+        {
+          permissions
+        }
+      );
+
+      await ctx.reply(
+        `🔓 *User Unmuted Successfully*\n\n` +
+        `👤 User: ${user.first_name || "User"}\n` +
+        `🆔 ID: \`${user.id}\`\n\n` +
+        `✅ User can send messages again.\n\n` +
+        `🛡️ GroupDefenders`,
+        {
+          parse_mode: "Markdown"
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Unmute error:",
+        error.message
+      );
+
+      await ctx.reply(
+        "❌ User ko unmute nahi kar saka.\n\n" +
+        "Check karo bot ke paas *Restrict Members* permission hai.",
+        {
+          parse_mode: "Markdown"
+        }
+      );
+    }
+  });
+   
   /* =======================================
      FILTER COMMAND
   ======================================= */
