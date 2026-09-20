@@ -1016,7 +1016,7 @@ function setupCommands(bot) {
 
   bot.action(
     "filter_add_info",
-    asyn(ctx) => {
+    async (ctx) => {
 
       await ctx.answerCbQuery();
 
