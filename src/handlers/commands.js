@@ -852,7 +852,69 @@ function setupCommands(bot) {
       );
     }
   });
-   
+
+     });
+ 
+  /* =======================================
+     INLINE: UNBAN USER
+  ======================================= */
+
+  bot.action(
+    /^unban_user:(-?\d+)$/,
+    async (ctx) => {
+
+      await ctx.answerCbQuery();
+
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
+      }
+
+      const userId =
+        Number(ctx.match[1]);
+
+      try {
+
+        await ctx.telegram.unbanChatMember(
+          ctx.chat.id,
+          userId,
+          {
+            only_if_banned: true
+          }
+        );
+
+        await ctx.editMessageText(
+          "🔓 *User Unbanned Successfully*\n\n" +
+          `🆔 ID: \`${userId}\`\n\n` +
+          "✅ User can join the group again.\n\n" +
+          "🛡️ GroupDefenders",
+          {
+            parse_mode: "Markdown"
+          }
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Inline unban error:",
+          error.message
+        );
+
+        await ctx.reply(
+          "❌ User ko unban nahi kar saka.\n\n" +
+          "Check karo bot ke paas *Ban Users* permission hai.",
+          {
+            parse_mode: "Markdown"
+          }
+        );
+      }
+    }
+  );
+
+  /* =======================================
+     FILTER COMMAND
+  ======================================= */
   /* =======================================
      FILTER COMMAND
   ======================================= */
