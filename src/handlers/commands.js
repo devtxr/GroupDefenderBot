@@ -2,8 +2,14 @@ const { Markup } = require("telegraf");
 const Group = require("../models/Group");
 const Warning = require("../models/Warning");
 
+/* =========================================
+   CHECK GROUP ADMIN
+========================================= */
+
 async function isAdmin(ctx) {
-  if (!ctx.chat || !["group", "supergroup"].includes(ctx.chat.type)) {
+  if (!ctx.chat) return false;
+
+  if (!["group", "supergroup"].includes(ctx.chat.type)) {
     return false;
   }
 
@@ -13,18 +19,33 @@ async function isAdmin(ctx) {
       ctx.from.id
     );
 
-    return ["creator", "administrator"].includes(member.status);
-  } catch {
+    return (
+      member.status === "creator" ||
+      member.status === "administrator"
+    );
+  } catch (error) {
+    console.error("Admin check error:", error.message);
     return false;
   }
 }
 
+/* =========================================
+   GET / CREATE GROUP
+========================================= */
+
 async function getGroup(ctx) {
   return Group.findOneAndUpdate(
-    { chatId: String(ctx.chat.id) },
+    {
+      chatId: String(ctx.chat.id)
+    },
     {
       $setOnInsert: {
-        title: ctx.chat.title || ""
+        title: ctx.chat.title || "",
+        antiLink: true,
+        antiProfanity: true,
+        maxWarnings: 3,
+        muteMinutes: 60,
+        customWords: []
       }
     },
     {
@@ -34,74 +55,118 @@ async function getGroup(ctx) {
   );
 }
 
-/* =========================
-   MAIN MENU
-========================= */
+/* =========================================
+   MAIN INLINE PANEL
+========================================= */
 
 function mainMenu() {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback("⚙️ Settings", "settings"),
-      Markup.button.callback("🛡️ Moderation", "moderation")
+      Markup.button.callback(
+        "⚙️ Settings",
+        "settings"
+      ),
+      Markup.button.callback(
+        "🛡️ Moderation",
+        "moderation"
+      )
     ],
     [
-      Markup.button.callback("⚠️ My Warnings", "my_warnings"),
-      Markup.button.callback("📖 Help", "help")
+      Markup.button.callback(
+        "⚠️ My Warnings",
+        "my_warnings"
+      ),
+      Markup.button.callback(
+        "📖 Help",
+        "help"
+      )
     ]
   ]);
 }
 
-/* =========================
+/* =========================================
    SETTINGS MENU
-========================= */
+========================================= */
 
 function settingsMenu(group) {
   return Markup.inlineKeyboard([
     [
       Markup.button.callback(
-        `🔗 Anti-Link: ${group.antiLink ? "ON 🟢" : "OFF 🔴"}`,
+        `🔗 Anti-Link: ${
+          group.antiLink ? "ON 🟢" : "OFF 🔴"
+        }`,
         "toggle_antilink"
       )
     ],
     [
       Markup.button.callback(
-        `🤬 Anti-Abuse: ${group.antiProfanity ? "ON 🟢" : "OFF 🔴"}`,
+        `🤬 Anti-Abuse: ${
+          group.antiProfanity ? "ON 🟢" : "OFF 🔴"
+        }`,
         "toggle_profanity"
       )
     ],
     [
-      Markup.button.callback("⚠️ Warning Settings", "warning_settings"),
-      Markup.button.callback("🧾 Filters", "filters")
+      Markup.button.callback(
+        "⚠️ Warning Settings",
+        "warning_settings"
+      ),
+      Markup.button.callback(
+        "🧾 Filters",
+        "filters"
+      )
     ],
     [
-      Markup.button.callback("🔙 Back", "home")
+      Markup.button.callback(
+        "🔙 Back",
+        "home"
+      )
     ]
   ]);
 }
 
-/* =========================
+/* =========================================
    MODERATION MENU
-========================= */
+========================================= */
 
-function moderationMenu() {
+function moderationMenu(group) {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback("🔗 Anti-Link", "toggle_antilink"),
-      Markup.button.callback("🤬 Anti-Abuse", "toggle_profanity")
+      Markup.button.callback(
+        `🔗 Anti-Link ${
+          group.antiLink ? "🟢" : "🔴"
+        }`,
+        "toggle_antilink"
+      ),
+      Markup.button.callback(
+        `🤬 Anti-Abuse ${
+          group.antiProfanity ? "🟢" : "🔴"
+        }`,
+        "toggle_profanity"
+      )
     ],
     [
-      Markup.button.callback("🧾 Custom Filters", "filters"),
-      Markup.button.callback("⚠️ Warnings", "warning_settings")
+      Markup.button.callback(
+        "⚠️ Warnings",
+        "warning_settings"
+      ),
+      Markup.button.callback(
+        "🧾 Filters",
+        "filters"
+      )
     ],
     [
-      Markup.button.callback("🔙 Back", "home")
+      Markup.button.callback(
+        "🔙 Back",
+        "home"
+      )
     ]
   ]);
 }
 
-/* =========================
-   WARNING SETTINGS
-========================= */
+/* =========================================
+   WARNING MENU
+========================================= */
 
 function warningMenu(group) {
   return Markup.inlineKeyboard([
@@ -118,98 +183,201 @@ function warningMenu(group) {
       )
     ],
     [
-      Markup.button.callback("🔙 Settings", "settings")
+      Markup.button.callback(
+        "🔙 Settings",
+        "settings"
+      )
     ]
   ]);
 }
 
-/* =========================
+/* =========================================
    FILTER MENU
-========================= */
+========================================= */
 
 function filterMenu() {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback("📋 Filter List", "filter_list")
+      Markup.button.callback(
+        "📋 Filter List",
+        "filter_list"
+      )
     ],
     [
       Markup.button.callback(
         "➕ Add Filter",
         "filter_add_info"
-      )
-    ],
-    [
+      ),
       Markup.button.callback(
         "➖ Remove Filter",
         "filter_remove_info"
       )
     ],
     [
-      Markup.button.callback("🔙 Settings", "settings")
+      Markup.button.callback(
+        "🔙 Settings",
+        "settings"
+      )
     ]
   ]);
 }
 
-/* =========================
+/* =========================================
    HELP TEXT
-========================= */
+========================================= */
 
 function helpText() {
   return (
-    "🛡️ *Telegram Moderator Bot*\n\n" +
-    "Available commands:\n\n" +
-    "⚙️ /panel - Open control panel\n" +
-    "⚙️ /settings - Group settings\n" +
-    "🔗 /antilink on|off\n" +
-    "🤬 /antigaali on|off\n" +
-    "⚠️ /warnings - Your warnings\n" +
-    "🔄 /resetwarn - Reset warnings\n\n" +
-    "🧾 Custom filters:\n" +
+    "🛡️ *GroupDefenders Bot*\n\n" +
+    "Professional Telegram moderation system.\n\n" +
+
+    "🔗 *Anti-Link*\n" +
+    "Automatically detects links and removes them.\n\n" +
+
+    "🤬 *Anti-Abuse*\n" +
+    "Detects configured Hindi/Hinglish/English abusive words.\n\n" +
+
+    "⚠️ *Warnings*\n" +
+    "Users receive warnings for rule violations.\n\n" +
+
+    "🔇 *Auto Mute*\n" +
+    "Users can be temporarily muted after reaching the warning limit.\n\n" +
+
+    "🧾 *Custom Filters*\n" +
+    "Admins can add their own filtered words.\n\n" +
+
+    "Commands:\n" +
+    "/panel - Open admin panel\n" +
+    "/settings - Group settings\n" +
+    "/antilink on|off\n" +
+    "/antigaali on|off\n" +
+    "/warnings - Check your warnings\n" +
+    "/resetwarn - Reset replied user's warnings\n" +
     "/filter add WORD\n" +
     "/filter remove WORD\n" +
-    "/filter list\n\n" +
-    "👮 Admin commands require group admin permission."
+    "/filter list"
   );
 }
 
-/* =========================
+/* =========================================
    SETUP COMMANDS
-========================= */
+========================================= */
 
 function setupCommands(bot) {
 
-  /* START */
+  /* =======================================
+     START COMMAND
+  ======================================= */
 
-  bot.start(async ctx => {
-    await ctx.reply(
-      "🛡️ *Telegram Moderator Bot*\n\n" +
-      "Multi-group moderation system.\n\n" +
-      "Add me as an administrator to your group.",
-      {
-        parse_mode: "Markdown",
-        ...mainMenu()
-      }
-    );
-  });
+  bot.start(async (ctx) => {
 
-  /* PANEL */
+    /* PRIVATE CHAT */
 
-  bot.command("panel", async ctx => {
-    if (!["group", "supergroup"].includes(ctx.chat.type)) {
+    if (ctx.chat.type === "private") {
+
+      const botUsername =
+        ctx.botInfo?.username || "GroupDefendersBot";
+
       return ctx.reply(
-        "⚠️ /panel group me use karo."
+        "🛡️ *GroupDefenders Bot*\n\n" +
+
+        "Professional Telegram Group Moderation Bot.\n\n" +
+
+        "✨ Features:\n" +
+        "🔗 Anti-Link Protection\n" +
+        "🤬 Hindi + English Abuse Filter\n" +
+        "⚠️ Warning System\n" +
+        "🔇 Automatic Mute\n" +
+        "🧾 Custom Filters\n" +
+        "👮 Admin Control Panel\n\n" +
+
+        "👇 Bot ko apne Telegram group me add karo:",
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.url(
+                "➕ Add to Group",
+                `https://t.me/${botUsername}?startgroup=true`
+              )
+            ],
+            [
+              Markup.button.callback(
+                "📖 Help",
+                "help"
+              )
+            ]
+          ])
+        }
       );
     }
 
-    const admin = await isAdmin(ctx);
+    /* GROUP CHAT */
 
-    if (!admin) {
-      return ctx.reply("❌ Sirf group admins panel use kar sakte hain.");
+    if (
+      ctx.chat.type === "group" ||
+      ctx.chat.type === "supergroup"
+    ) {
+
+      const admin = await isAdmin(ctx);
+
+      if (!admin) {
+
+        return ctx.reply(
+          "⚠️ *Bot Setup Required*\n\n" +
+
+          "Pehle mujhe is group me *Administrator* banao.\n\n" +
+
+          "Required permissions:\n" +
+          "🗑️ Delete Messages\n" +
+          "🔇 Restrict Members\n\n" +
+
+          "Admin banane ke baad /panel bhejo.",
+          {
+            parse_mode: "Markdown"
+          }
+        );
+      }
+
+      return ctx.reply(
+        "🛡️ *GroupDefenders Control Panel*\n\n" +
+
+        "✅ Bot successfully configured!\n\n" +
+
+        "Neeche buttons se moderation settings control karo:",
+        {
+          parse_mode: "Markdown",
+          ...mainMenu()
+        }
+      );
+    }
+  });
+
+  /* =======================================
+     PANEL COMMAND
+  ======================================= */
+
+  bot.command("panel", async (ctx) => {
+
+    if (
+      !["group", "supergroup"].includes(
+        ctx.chat.type
+      )
+    ) {
+      return ctx.reply(
+        "⚠️ /panel ko Telegram group me use karo."
+      );
+    }
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply(
+        "❌ Sirf group administrators panel use kar sakte hain."
+      );
     }
 
     await ctx.reply(
-      "🎛️ *Group Control Panel*\n\n" +
-      "Neeche se setting select karo:",
+      "🎛️ *GroupDefenders Control Panel*\n\n" +
+      "Neeche se option select karo:",
       {
         parse_mode: "Markdown",
         ...mainMenu()
@@ -217,18 +385,27 @@ function setupCommands(bot) {
     );
   });
 
-  /* HELP */
+  /* =======================================
+     HELP
+  ======================================= */
 
-  bot.command("help", async ctx => {
-    await ctx.reply(helpText(), {
-      parse_mode: "Markdown",
-      ...mainMenu()
-    });
+  bot.command("help", async (ctx) => {
+
+    await ctx.reply(
+      helpText(),
+      {
+        parse_mode: "Markdown",
+        ...mainMenu()
+      }
+    );
   });
 
-  /* SETTINGS */
+  /* =======================================
+     SETTINGS COMMAND
+  ======================================= */
 
-  bot.command("settings", async ctx => {
+  bot.command("settings", async (ctx) => {
+
     if (!(await isAdmin(ctx))) {
       return ctx.reply("❌ Admin only.");
     }
@@ -237,10 +414,20 @@ function setupCommands(bot) {
 
     await ctx.reply(
       "⚙️ *Group Settings*\n\n" +
-      `🔗 Anti-Link: ${group.antiLink ? "ON 🟢" : "OFF 🔴"}\n` +
-      `🤬 Anti-Abuse: ${group.antiProfanity ? "ON 🟢" : "OFF 🔴"}\n` +
+
+      `🔗 Anti-Link: ${
+        group.antiLink ? "ON 🟢" : "OFF 🔴"
+      }\n` +
+
+      `🤬 Anti-Abuse: ${
+        group.antiProfanity ? "ON 🟢" : "OFF 🔴"
+      }\n` +
+
       `⚠️ Max Warnings: ${group.maxWarnings}\n` +
-      `🔇 Mute Time: ${group.muteMinutes} minutes`,
+
+      `🔇 Mute Time: ${
+        group.muteMinutes
+      } minutes`,
       {
         parse_mode: "Markdown",
         ...settingsMenu(group)
@@ -248,19 +435,26 @@ function setupCommands(bot) {
     );
   });
 
-  /* ANTI LINK */
+  /* =======================================
+     ANTI LINK COMMAND
+  ======================================= */
 
-  bot.command("antilink", async ctx => {
+  bot.command("antilink", async (ctx) => {
+
     if (!(await isAdmin(ctx))) {
       return ctx.reply("❌ Admin only.");
     }
 
-    const arg = ctx.message.text
-      .split(/\s+/)[1]
-      ?.toLowerCase();
+    const arg =
+      ctx.message.text
+        .split(/\s+/)[1]
+        ?.toLowerCase();
 
     if (!["on", "off"].includes(arg)) {
-      return ctx.reply("Usage: /antilink on|off");
+
+      return ctx.reply(
+        "Usage:\n/antilink on\n/antilink off"
+      );
     }
 
     const group = await getGroup(ctx);
@@ -270,24 +464,35 @@ function setupCommands(bot) {
     await group.save();
 
     await ctx.reply(
-      `🔗 Anti-Link ${group.antiLink ? "enabled 🟢" : "disabled 🔴"}.`,
+      `🔗 Anti-Link ${
+        group.antiLink
+          ? "enabled 🟢"
+          : "disabled 🔴"
+      }.`,
       settingsMenu(group)
     );
   });
 
-  /* ANTI GAALI */
+  /* =======================================
+     ANTI GAALI COMMAND
+  ======================================= */
 
-  bot.command("antigaali", async ctx => {
+  bot.command("antigaali", async (ctx) => {
+
     if (!(await isAdmin(ctx))) {
       return ctx.reply("❌ Admin only.");
     }
 
-    const arg = ctx.message.text
-      .split(/\s+/)[1]
-      ?.toLowerCase();
+    const arg =
+      ctx.message.text
+        .split(/\s+/)[1]
+        ?.toLowerCase();
 
     if (!["on", "off"].includes(arg)) {
-      return ctx.reply("Usage: /antigaali on|off");
+
+      return ctx.reply(
+        "Usage:\n/antigaali on\n/antigaali off"
+      );
     }
 
     const group = await getGroup(ctx);
@@ -298,49 +503,66 @@ function setupCommands(bot) {
 
     await ctx.reply(
       `🤬 Anti-Abuse ${
-        group.antiProfanity ? "enabled 🟢" : "disabled 🔴"
+        group.antiProfanity
+          ? "enabled 🟢"
+          : "disabled 🔴"
       }.`,
       settingsMenu(group)
     );
   });
 
-  /* WARNINGS */
+  /* =======================================
+     WARNINGS COMMAND
+  ======================================= */
 
-  bot.command("warnings", async ctx => {
+  bot.command("warnings", async (ctx) => {
+
     if (!ctx.from) return;
 
-    const warning = await Warning.findOne({
-      chatId: String(ctx.chat.id),
-      userId: String(ctx.from.id)
-    });
+    const warning =
+      await Warning.findOne({
+        chatId: String(ctx.chat.id),
+        userId: String(ctx.from.id)
+      });
 
     const group = await getGroup(ctx);
 
     await ctx.reply(
-      `⚠️ *Your Warnings*\n\n` +
-      `Current: ${warning?.count || 0}/${group.maxWarnings}`,
+      "⚠️ *Your Warnings*\n\n" +
+      `Current: ${
+        warning?.count || 0
+      }/${group.maxWarnings}`,
       {
         parse_mode: "Markdown"
       }
     );
   });
 
-  /* RESET WARNING */
+  /* =======================================
+     RESET WARNINGS
+  ======================================= */
 
-  bot.command("resetwarn", async ctx => {
+  bot.command("resetwarn", async (ctx) => {
+
     if (!(await isAdmin(ctx))) {
       return ctx.reply("❌ Admin only.");
     }
 
-    if (!ctx.message.reply_to_message?.from) {
+    if (
+      !ctx.message.reply_to_message ||
+      !ctx.message.reply_to_message.from
+    ) {
+
       return ctx.reply(
-        "↩️ Kisi user ke message ko reply karke /resetwarn bhejo."
+        "↩️ Kisi user ke message ko reply karke:\n\n" +
+        "/resetwarn"
       );
     }
 
-    const userId = String(
-      ctx.message.reply_to_message.from.id
-    );
+    const userId =
+      String(
+        ctx.message.reply_to_message.from.id
+      );
 
     await Warning.findOneAndUpdate(
       {
@@ -357,89 +579,127 @@ function setupCommands(bot) {
       }
     );
 
-    await ctx.reply("✅ User warnings reset ho gayi.");
+    await ctx.reply(
+      "✅ User ke warnings reset ho gaye."
+    );
   });
 
-  /* FILTER COMMAND */
+  /* =======================================
+     FILTER COMMAND
+  ======================================= */
 
-  bot.command("filter", async ctx => {
+  bot.command("filter", async (ctx) => {
+
     if (!(await isAdmin(ctx))) {
       return ctx.reply("❌ Admin only.");
     }
 
-    const parts = ctx.message.text
-      .trim()
-      .split(/\s+/);
+    const parts =
+      ctx.message.text
+        .trim()
+        .split(/\s+/);
 
-    const action = parts[1]?.toLowerCase();
-    const word = parts.slice(2).join(" ").trim();
+    const action =
+      parts[1]?.toLowerCase();
 
-    const group = await getGroup(ctx);
+    const word =
+      parts.slice(2)
+        .join(" ")
+        .trim();
 
-    if (action === "add" && word) {
+    const group =
+      await getGroup(ctx);
 
-      const value = word.toLowerCase();
+    /* ADD */
 
-      if (!group.customWords.includes(value)) {
+    if (
+      action === "add" &&
+      word
+    ) {
+
+      const value =
+        word.toLowerCase();
+
+      if (
+        !group.customWords.includes(value)
+      ) {
+
         group.customWords.push(value);
+
         await group.save();
       }
 
       return ctx.reply(
-        `✅ Filter added:\n\`${value}\``,
+        `✅ Filter added:\n\n\`${value}\``,
         {
           parse_mode: "Markdown"
         }
       );
     }
 
-    if (action === "remove" && word) {
+    /* REMOVE */
 
-      const value = word.toLowerCase();
+    if (
+      action === "remove" &&
+      word
+    ) {
+
+      const value =
+        word.toLowerCase();
 
       group.customWords =
         group.customWords.filter(
-          x => x !== value
+          (item) => item !== value
         );
 
       await group.save();
 
       return ctx.reply(
-        `✅ Filter removed:\n\`${value}\``,
+        `✅ Filter removed:\n\n\`${value}\``,
         {
           parse_mode: "Markdown"
         }
       );
     }
+
+    /* LIST */
 
     if (action === "list") {
 
+      const list =
+        group.customWords.length
+          ? group.customWords
+              .map(
+                (item, index) =>
+                  `${index + 1}. ${item}`
+              )
+              .join("\n")
+          : "No custom filters.";
+
       return ctx.reply(
         "🧾 *Custom Filters*\n\n" +
-        (
-          group.customWords.length
-            ? group.customWords.map(
-                (x, i) => `${i + 1}. ${x}`
-              ).join("\n")
-            : "No custom filters."
-        ),
+        list,
         {
-          parse_mode: "Markdown"
+          parse_mode: "Markdown",
+          ...filterMenu()
         }
       );
     }
 
-    await ctx.reply(
-      "🧾 Filter commands:",
-      filterMenu()
+    return ctx.reply(
+      "🧾 *Custom Filter Panel*",
+      {
+        parse_mode: "Markdown",
+        ...filterMenu()
+      }
     );
   });
 
-  /* =========================
-     CALLBACK BUTTONS
-  ========================= */
+  /* =======================================
+     INLINE: HOME
+  ======================================= */
 
-  bot.action("home", async ctx => {
+  bot.action("home", async (ctx) => {
 
     await ctx.answerCbQuery();
 
@@ -448,7 +708,7 @@ function setupCommands(bot) {
     }
 
     await ctx.editMessageText(
-      "🎛️ *Group Control Panel*\n\n" +
+      "🎛️ *GroupDefenders Control Panel*\n\n" +
       "Select an option:",
       {
         parse_mode: "Markdown",
@@ -457,9 +717,11 @@ function setupCommands(bot) {
     );
   });
 
-  /* SETTINGS BUTTON */
+  /* =======================================
+     INLINE: SETTINGS
+  ======================================= */
 
-  bot.action("settings", async ctx => {
+  bot.action("settings", async (ctx) => {
 
     await ctx.answerCbQuery();
 
@@ -467,14 +729,31 @@ function setupCommands(bot) {
       return ctx.reply("❌ Admin only.");
     }
 
-    const group = await getGroup(ctx);
+    const group =
+      await getGroup(ctx);
 
     await ctx.editMessageText(
       "⚙️ *Group Settings*\n\n" +
-      `🔗 Anti-Link: ${group.antiLink ? "ON 🟢" : "OFF 🔴"}\n` +
-      `🤬 Anti-Abuse: ${group.antiProfanity ? "ON 🟢" : "OFF 🔴"}\n` +
-      `⚠️ Max Warnings: ${group.maxWarnings}\n` +
-      `🔇 Mute Time: ${group.muteMinutes} minutes`,
+
+      `🔗 Anti-Link: ${
+        group.antiLink
+          ? "ON 🟢"
+          : "OFF 🔴"
+      }\n` +
+
+      `🤬 Anti-Abuse: ${
+        group.antiProfanity
+          ? "ON 🟢"
+          : "OFF 🔴"
+      }\n` +
+
+      `⚠️ Max Warnings: ${
+        group.maxWarnings
+      }\n` +
+
+      `🔇 Mute: ${
+        group.muteMinutes
+      } minutes`,
       {
         parse_mode: "Markdown",
         ...settingsMenu(group)
@@ -482,223 +761,364 @@ function setupCommands(bot) {
     );
   });
 
-  /* MODERATION BUTTON */
+  /* =======================================
+     INLINE: MODERATION
+  ======================================= */
 
-  bot.action("moderation", async ctx => {
+  bot.action("moderation", async (ctx) => {
 
     await ctx.answerCbQuery();
 
     if (!(await isAdmin(ctx))) {
       return ctx.reply("❌ Admin only.");
     }
+
+    const group =
+      await getGroup(ctx);
 
     await ctx.editMessageText(
       "🛡️ *Moderation Controls*\n\n" +
-      "Choose moderation option:",
+      "Neeche se option select karo:",
       {
         parse_mode: "Markdown",
-        ...moderationMenu()
+        ...moderationMenu(group)
       }
     );
   });
 
-  /* TOGGLE ANTI LINK */
+  /* =======================================
+     TOGGLE ANTI LINK
+  ======================================= */
 
-  bot.action("toggle_antilink", async ctx => {
+  bot.action(
+    "toggle_antilink",
+    async (ctx) => {
 
-    await ctx.answerCbQuery();
+      await ctx.answerCbQuery();
 
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply("❌ Admin only.");
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
+      }
+
+      const group =
+        await getGroup(ctx);
+
+      group.antiLink =
+        !group.antiLink;
+
+      await group.save();
+
+      await ctx.editMessageText(
+        "⚙️ *Group Settings*\n\n" +
+
+        `🔗 Anti-Link: ${
+          group.antiLink
+            ? "ON 🟢"
+            : "OFF 🔴"
+        }\n` +
+
+        `🤬 Anti-Abuse: ${
+          group.antiProfanity
+            ? "ON 🟢"
+            : "OFF 🔴"
+        }`,
+        {
+          parse_mode: "Markdown",
+          ...settingsMenu(group)
+        }
+      );
     }
+  );
 
-    const group = await getGroup(ctx);
+  /* =======================================
+     TOGGLE PROFANITY
+  ======================================= */
 
-    group.antiLink = !group.antiLink;
+  bot.action(
+    "toggle_profanity",
+    async (ctx) => {
 
-    await group.save();
+      await ctx.answerCbQuery();
 
-    await ctx.editMessageText(
-      "⚙️ *Group Settings*\n\n" +
-      `🔗 Anti-Link: ${group.antiLink ? "ON 🟢" : "OFF 🔴"}\n` +
-      `🤬 Anti-Abuse: ${group.antiProfanity ? "ON 🟢" : "OFF 🔴"}`,
-      {
-        parse_mode: "Markdown",
-        ...settingsMenu(group)
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
       }
-    );
-  });
 
-  /* TOGGLE PROFANITY */
+      const group =
+        await getGroup(ctx);
 
-  bot.action("toggle_profanity", async ctx => {
+      group.antiProfanity =
+        !group.antiProfanity;
 
-    await ctx.answerCbQuery();
+      await group.save();
 
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply("❌ Admin only.");
+      await ctx.editMessageText(
+        "⚙️ *Group Settings*\n\n" +
+
+        `🔗 Anti-Link: ${
+          group.antiLink
+            ? "ON 🟢"
+            : "OFF 🔴"
+        }\n` +
+
+        `🤬 Anti-Abuse: ${
+          group.antiProfanity
+            ? "ON 🟢"
+            : "OFF 🔴"
+        }`,
+        {
+          parse_mode: "Markdown",
+          ...settingsMenu(group)
+        }
+      );
     }
+  );
 
-    const group = await getGroup(ctx);
+  /* =======================================
+     WARNING SETTINGS
+  ======================================= */
 
-    group.antiProfanity =
-      !group.antiProfanity;
+  bot.action(
+    "warning_settings",
+    async (ctx) => {
 
-    await group.save();
+      await ctx.answerCbQuery();
 
-    await ctx.editMessageText(
-      "⚙️ *Group Settings*\n\n" +
-      `🔗 Anti-Link: ${group.antiLink ? "ON 🟢" : "OFF 🔴"}\n` +
-      `🤬 Anti-Abuse: ${group.antiProfanity ? "ON 🟢" : "OFF 🔴"}`,
-      {
-        parse_mode: "Markdown",
-        ...settingsMenu(group)
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
       }
-    );
-  });
 
-  /* WARNING SETTINGS */
+      const group =
+        await getGroup(ctx);
 
-  bot.action("warning_settings", async ctx => {
+      await ctx.editMessageText(
+        "⚠️ *Warning Settings*\n\n" +
 
-    await ctx.answerCbQuery();
+        `Maximum warnings: ${
+          group.maxWarnings
+        }\n` +
 
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply("❌ Admin only.");
+        `Mute duration: ${
+          group.muteMinutes
+        } minutes`,
+        {
+          parse_mode: "Markdown",
+          ...warningMenu(group)
+        }
+      );
     }
+  );
 
-    const group = await getGroup(ctx);
+  /* =======================================
+     WARNING INFO
+  ======================================= */
 
-    await ctx.editMessageText(
-      "⚠️ *Warning Settings*\n\n" +
-      `Maximum warnings: ${group.maxWarnings}\n` +
-      `Mute duration: ${group.muteMinutes} minutes`,
-      {
-        parse_mode: "Markdown",
-        ...warningMenu(group)
-      }
-    );
-  });
+  bot.action(
+    "warning_info",
+    async (ctx) => {
 
-  bot.action("warning_info", async ctx => {
-
-    await ctx.answerCbQuery(
-      "Max warnings database setting se controlled hai."
-    );
-  });
-
-  bot.action("mute_info", async ctx => {
-
-    await ctx.answerCbQuery(
-      "Mute duration database setting se controlled hai."
-    );
-  });
-
-  /* FILTERS */
-
-  bot.action("filters", async ctx => {
-
-    await ctx.answerCbQuery();
-
-    if (!(await isAdmin(ctx))) {
-      return ctx.reply("❌ Admin only.");
+      await ctx.answerCbQuery(
+        "Current limit database se configured hai."
+      );
     }
+  );
 
-    await ctx.editMessageText(
-      "🧾 *Custom Filters*\n\n" +
-      "Custom filter manage karne ke liye buttons use karo.",
-      {
-        parse_mode: "Markdown",
-        ...filterMenu()
+  /* =======================================
+     MUTE INFO
+  ======================================= */
+
+  bot.action(
+    "mute_info",
+    async (ctx) => {
+
+      await ctx.answerCbQuery(
+        "Current mute duration database se configured hai."
+      );
+    }
+  );
+
+  /* =======================================
+     FILTERS
+  ======================================= */
+
+  bot.action(
+    "filters",
+    async (ctx) => {
+
+      await ctx.answerCbQuery();
+
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
       }
-    );
-  });
 
-  bot.action("filter_list", async ctx => {
+      await ctx.editMessageText(
+        "🧾 *Custom Filters*\n\n" +
+        "Custom filters manage karne ke liye option select karo:",
+        {
+          parse_mode: "Markdown",
+          ...filterMenu()
+        }
+      );
+    }
+  );
 
-    await ctx.answerCbQuery();
+  /* =======================================
+     FILTER LIST
+  ======================================= */
 
-    const group = await getGroup(ctx);
+  bot.action(
+    "filter_list",
+    async (ctx) => {
 
-    await ctx.editMessageText(
-      "🧾 *Custom Filters*\n\n" +
-      (
+      await ctx.answerCbQuery();
+
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
+      }
+
+      const group =
+        await getGroup(ctx);
+
+      const list =
         group.customWords.length
-          ? group.customWords.map(
-              (x, i) => `${i + 1}. ${x}`
-            ).join("\n")
-          : "No custom filters."
-      ),
-      {
-        parse_mode: "Markdown",
-        ...filterMenu()
+          ? group.customWords
+              .map(
+                (item, index) =>
+                  `${index + 1}. ${item}`
+              )
+              .join("\n")
+          : "No custom filters.";
+
+      await ctx.editMessageText(
+        "🧾 *Custom Filters*\n\n" +
+        list,
+        {
+          parse_mode: "Markdown",
+          ...filterMenu()
+        }
+      );
+    }
+  );
+
+  /* =======================================
+     FILTER ADD INFO
+  ======================================= */
+
+  bot.action(
+    "filter_add_info",
+    asyn(ctx) => {
+
+      await ctx.answerCbQuery();
+
+      await ctx.reply(
+        "➕ Filter add karne ke liye:\n\n" +
+        "`/filter add WORD`",
+        {
+          parse_mode: "Markdown"
+        }
+      );
+    }
+  );
+
+  /* =======================================
+     FILTER REMOVE INFO
+  ======================================= */
+
+  bot.action(
+    "filter_remove_info",
+    async (ctx) => {
+
+      await ctx.answerCbQuery();
+
+      await ctx.reply(
+        "➖ Filter remove karne ke liye:\n\n" +
+        "`/filter remove WORD`",
+        {
+          parse_mode: "Markdown"
+        }
+      );
+    }
+  );
+
+  /* =======================================
+     MY WARNINGS BUTTON
+  ======================================= */
+
+  bot.action(
+    "my_warnings",
+    async (ctx) => {
+
+      await ctx.answerCbQuery();
+
+      if (
+        !["group", "supergroup"].includes(
+          ctx.chat.type
+        )
+      ) {
+        return ctx.reply(
+          "⚠️ Ye option group me use karo."
+        );
       }
-    );
-  });
 
-  bot.action("filter_add_info", async ctx => {
+      const warning =
+        await Warning.findOne({
+          chatId: String(
+            ctx.chat.id
+          ),
+          userId: String(
+            ctx.from.id
+          )
+        });
 
-    await ctx.answerCbQuery();
+      const group =
+        await getGroup(ctx);
 
-    await ctx.reply(
-      "➕ Filter add karne ke liye:\n\n" +
-      "`/filter add WORD`",
-      {
-        parse_mode: "Markdown"
-      }
-    );
-  });
+      await ctx.reply(
+        "⚠️ *Your Warnings*\n\n" +
+        `Current: ${
+          warning?.count || 0
+        }/${group.maxWarnings}`,
+        {
+          parse_mode: "Markdown"
+        }
+      );
+    }
+  );
 
-  bot.action("filter_remove_info", async ctx => {
+  /* =======================================
+     HELP BUTTON
+  ======================================= */
 
-    await ctx.answerCbQuery();
+  bot.action(
+    "help",
+    async (ctx) => {
 
-    await ctx.reply(
-      "➖ Filter remove karne ke liye:\n\n" +
-      "`/filter remove WORD`",
-      {
-        parse_mode: "Markdown"
-      }
-    );
-  });
+      await ctx.answerCbQuery();
 
-  /* MY WARNINGS */
-
-  bot.action("my_warnings", async ctx => {
-
-    await ctx.answerCbQuery();
-
-    const warning = await Warning.findOne({
-      chatId: String(ctx.chat.id),
-      userId: String(ctx.from.id)
-    });
-
-    const group = await getGroup(ctx);
-
-    await ctx.reply(
-      `⚠️ *Your Warnings*\n\n` +
-      `Current: ${warning?.count || 0}/${group.maxWarnings}`,
-      {
-        parse_mode: "Markdown"
-      }
-    );
-  });
-
-  /* HELP BUTTON */
-
-  bot.action("help", async ctx => {
-
-    await ctx.answerCbQuery();
-
-    await ctx.editMessageText(
-      helpText(),
-      {
-        parse_mode: "Markdown",
-        ...mainMenu()
-      }
-    );
-  });
+      await ctx.editMessageText(
+        helpText(),
+        {
+          parse_mode: "Markdown",
+          ...mainMenu()
+        }
+      );
+    }
+  );
 }
+
+/* =========================================
+   EXPORT
+========================================= */
 
 module.exports = {
   setupCommands
