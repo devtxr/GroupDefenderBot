@@ -101,7 +101,22 @@ async function getGroup(ctx) {
     }
   );
 }
+/* =========================================
+   AUTO DELETE BOT MESSAGE
+========================================= */
 
+function deleteLater(ctx, message, delay = 7000) {
+  setTimeout(async () => {
+    try {
+      await ctx.telegram.deleteMessage(
+        ctx.chat.id,
+        message.message_id
+      );
+    } catch (error) {
+      // Message already deleted or permission missing
+    }
+  }, delay);
+}
 /* =========================================
    WARNING MESSAGE
 ========================================= */
