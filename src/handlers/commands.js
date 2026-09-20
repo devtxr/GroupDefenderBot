@@ -158,7 +158,15 @@ function moderationMenu(group) {
         "toggle_profanity"
       )
     ],
-    [
+     [
+  Markup.button.callback(
+    `🚨 Anti-Spam ${
+      group.antiSpam ? "🟢" : "🔴"
+    }`,
+    "toggle_antispam"
+  )
+],
+ [
       Markup.button.callback(
         "⚠️ Warnings",
         "warning_settings"
