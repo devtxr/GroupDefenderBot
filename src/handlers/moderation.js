@@ -450,7 +450,14 @@ function setupModeration(bot) {
         ) {
           return next();
         }
+        
+        /* =================================
+   IGNORE CHANNEL POSTS
+================================= */
 
+if (ctx.message?.sender_chat) {
+  return next();
+}
         /* =================================
            IGNORE ADMINS
         ================================= */
