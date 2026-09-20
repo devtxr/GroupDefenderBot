@@ -20,7 +20,7 @@ async function main() {
   const bot = new Telegraf(token);
   setupCommands(bot);
   setupModeration(bot);
-
+  setupAntiSpam(bot);
   const app = express();
   app.use(express.json());
 
