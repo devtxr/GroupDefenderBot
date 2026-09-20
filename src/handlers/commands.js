@@ -852,8 +852,6 @@ function setupCommands(bot) {
       );
     }
   });
-
-     });
  
   /* =======================================
      INLINE: UNBAN USER
