@@ -898,7 +898,40 @@ function setupCommands(bot) {
       );
     }
   );
+  /* =======================================
+     TOGGLE ANTI SPAM
+  ======================================= */
 
+  bot.action(
+    "toggle_antispam",
+    async (ctx) => {
+
+      await ctx.answerCbQuery();
+
+      if (!(await isAdmin(ctx))) {
+        return ctx.reply(
+          "❌ Admin only."
+        );
+      }
+
+      const group =
+        await getGroup(ctx);
+
+      group.antiSpam =
+        !group.antiSpam;
+
+      await group.save();
+
+      await ctx.editMessageText(
+        "🛡️ *Moderation Controls*\n\n" +
+        "Neeche se option select karo:",
+        {
+          parse_mode: "Markdown",
+          ...moderationMenu(group)
+        }
+      );
+    }
+  );
   /* =======================================
      WARNING SETTINGS
   ======================================= */
