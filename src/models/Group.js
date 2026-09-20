@@ -5,6 +5,7 @@ const groupSchema = new mongoose.Schema({
   title: { type: String, default: "" },
   antiLink: { type: Boolean, default: true },
   antiProfanity: { type: Boolean, default: true },
+  antiSpam: { type: Boolean, default: true },
   maxWarnings: { type: Number, default: 3 },
   muteMinutes: { type: Number, default: 60 },
   customWords: { type: [String], default: [] }
