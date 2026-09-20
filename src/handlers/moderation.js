@@ -26,8 +26,8 @@ async function isAdmin(ctx, userId) {
     /*
      * Anonymous Administrator
      *
-     * When an admin sends a message anonymously,
-     * Telegram uses sender_chat = current group.
+     * Telegram anonymous admin messages use
+     * sender_chat = current group.
      */
 
     if (
@@ -393,7 +393,7 @@ function setupModeration(bot) {
 
   bot.on(
     "message",
-    async (ctx) => {
+    async (ctx, next) => {
 
       try {
 
@@ -410,7 +410,7 @@ function setupModeration(bot) {
             ctx.chat.type
           )
         ) {
-          return;
+          return next();
         }
 
         /* =================================
@@ -421,7 +421,7 @@ function setupModeration(bot) {
           !ctx.from ||
           ctx.from.is_bot
         ) {
-          return;
+          return next();
         }
 
         /* =================================
@@ -434,7 +434,7 @@ function setupModeration(bot) {
             ctx.from.id
           )
         ) {
-          return;
+          return next();
         }
 
         /* =================================
@@ -446,8 +446,13 @@ function setupModeration(bot) {
           ctx.message.caption ||
           "";
 
+        /*
+         * If message has no text/caption,
+         * continue to Anti-Spam.
+         */
+
         if (!text) {
-          return;
+          return next();
         }
 
         /* =================================
@@ -495,12 +500,27 @@ function setupModeration(bot) {
           }
         }
 
+        /* =================================
+           PASS TO NEXT HANDLER
+        ================================= */
+
+        return next();
+
       } catch (error) {
 
         console.error(
           "Moderation error:",
           error.message
         );
+
+        /*
+         * Even if moderation has an error,
+         * don't block Anti-Spam.
+         */
+
+        try {
+          return next();
+        } catch {}
       }
     }
   );
