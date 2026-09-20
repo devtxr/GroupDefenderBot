@@ -194,7 +194,7 @@ async function createCaptcha(ctx, userId) {
 function setupCaptcha(bot) {
 
   bot.on(
-    "new_chat_members",
+    "message",
     async (ctx) => {
 
       try {
