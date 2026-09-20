@@ -5,7 +5,7 @@ const { Telegraf } = require("telegraf");
 const { connectDB } = require("./database");
 const { setupCommands } = require("./handlers/commands");
 const { setupModeration } = require("./handlers/moderation");
-
+const { setupAntiSpam } = require("./handlers/antispam");
 const token = process.env.BOT_TOKEN;
 const port = Number(process.env.PORT || 10000);
 const webhookUrl = process.env.WEBHOOK_URL;
