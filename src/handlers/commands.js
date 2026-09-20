@@ -688,6 +688,170 @@ function setupCommands(bot) {
       );
     }
   });
+
+     /* =======================================
+     BAN USER
+  ======================================= */
+
+  bot.command("ban", async (ctx) => {
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply("❌ Admin only.");
+    }
+
+    if (
+      !ctx.message.reply_to_message ||
+      !ctx.message.reply_to_message.from
+    ) {
+      return ctx.reply(
+        "↩️ User ke message ko reply karke:\n\n" +
+        "/ban"
+      );
+    }
+
+    const user =
+      ctx.message.reply_to_message.from;
+
+    if (user.is_bot) {
+      return ctx.reply(
+        "⚠️ Bots ko ban nahi kiya ja sakta."
+      );
+    }
+
+    try {
+
+      const target =
+        await ctx.telegram.getChatMember(
+          ctx.chat.id,
+          user.id
+        );
+
+      if (
+        target.status === "creator" ||
+        target.status === "administrator"
+      ) {
+        return ctx.reply(
+          "⚠️ Group administrators ko ban nahi kiya ja sakta."
+        );
+      }
+
+      await ctx.telegram.banChatMember(
+        ctx.chat.id,
+        user.id
+      );
+
+      await ctx.reply(
+        "🚫 *User Banned Successfully*\n\n" +
+        `👤 User: ${user.first_name || "User"}\n` +
+        `🆔 ID: \`${user.id}\`\n\n` +
+        "⛔ User is permanently banned.\n\n" +
+        "🛡️ GroupDefenders",
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback(
+                "🔓 Unban User",
+                `unban_user:${user.id}`
+              )
+            ]
+          ])
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Ban error:",
+        error.message
+      );
+
+      await ctx.reply(
+        "❌ User ko ban nahi kar saka.\n\n" +
+        "Check karo bot ke paas *Ban Users* permission hai.",
+        {
+          parse_mode: "Markdown"
+        }
+      );
+    }
+  });
+
+
+  /* =======================================
+     UNBAN USER
+  ======================================= */
+
+  bot.command("unban", async (ctx) => {
+
+    if (!(await isAdmin(ctx))) {
+      return ctx.reply("❌ Admin only.");
+    }
+
+    const parts =
+      ctx.message.text
+        .trim()
+        .split(/\s+/);
+
+    let userId = parts[1];
+
+    if (
+      !userId &&
+      ctx.message.reply_to_message?.from?.id
+    ) {
+      userId =
+        String(
+          ctx.message.reply_to_message.from.id
+        );
+    }
+
+    if (
+      !userId ||
+      !/^-?\d+$/.test(userId)
+    ) {
+      return ctx.reply(
+        "🆔 User ID do:\n\n" +
+        "/unban USER_ID\n\n" +
+        "Example:\n" +
+        "/unban 123456789"
+      );
+    }
+
+    try {
+
+      await ctx.telegram.unbanChatMember(
+        ctx.chat.id,
+        Number(userId),
+        {
+          only_if_banned: true
+        }
+      );
+
+      await ctx.reply(
+        "🔓 *User Unbanned Successfully*\n\n" +
+        `🆔 ID: \`${userId}\`\n\n` +
+        "✅ User can join the group again.\n\n" +
+        "🛡️ GroupDefenders",
+        {
+          parse_mode: "Markdown"
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Unban error:",
+        error.message
+      );
+
+      await ctx.reply(
+        "❌ User ko unban nahi kar saka.\n\n" +
+        "User ID check karo aur bot ke paas *Ban Users* permission hai ya nahi.",
+        {
+          parse_mode: "Markdown"
+        }
+      );
+    }
+  });
    
   /* =======================================
      FILTER COMMAND
