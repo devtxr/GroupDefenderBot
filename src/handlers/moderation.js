@@ -11,10 +11,42 @@ const URL_RE =
 
 async function isAdmin(ctx, userId) {
   try {
-    const member = await ctx.telegram.getChatMember(
-      ctx.chat.id,
-      userId
-    );
+    if (!ctx.chat) {
+      return false;
+    }
+
+    if (
+      !["group", "supergroup"].includes(
+        ctx.chat.type
+      )
+    ) {
+      return false;
+    }
+
+    /*
+     * Anonymous Administrator
+     *
+     * When an admin sends a message anonymously,
+     * Telegram uses sender_chat = current group.
+     */
+
+    if (
+      ctx.message?.sender_chat &&
+      String(ctx.message.sender_chat.id) ===
+        String(ctx.chat.id)
+    ) {
+      return true;
+    }
+
+    if (!userId) {
+      return false;
+    }
+
+    const member =
+      await ctx.telegram.getChatMember(
+        ctx.chat.id,
+        userId
+      );
 
     return [
       "creator",
@@ -22,15 +54,65 @@ async function isAdmin(ctx, userId) {
     ].includes(member.status);
 
   } catch (error) {
+
+    console.error(
+      "Admin check error:",
+      error.message
+    );
+
     return false;
   }
+}
+
+/* =========================================
+   GET / CREATE GROUP
+========================================= */
+
+async function getGroup(ctx) {
+
+  return Group.findOneAndUpdate(
+    {
+      chatId:
+        String(ctx.chat.id)
+    },
+
+    {
+      $setOnInsert: {
+        title:
+          ctx.chat.title || "",
+
+        antiLink: true,
+
+        antiProfanity: true,
+
+        antiSpam: true,
+
+        maxWarnings: 3,
+
+        muteMinutes: 60,
+
+        customWords: []
+      }
+    },
+
+    {
+      upsert: true,
+      new: true
+    }
+  );
 }
 
 /* =========================================
    WARNING MESSAGE
 ========================================= */
 
-async function sendWarning(ctx, user, count, maxWarnings, reason) {
+async function sendWarning(
+  ctx,
+  user,
+  count,
+  maxWarnings,
+  reason
+) {
 
   const name =
     user.first_name ||
@@ -43,7 +125,9 @@ async function sendWarning(ctx, user, count, maxWarnings, reason) {
       : name;
 
   const isLink =
-    reason.includes("Link");
+    reason
+      .toLowerCase()
+      .includes("link");
 
   const reasonText =
     isLink
@@ -56,33 +140,53 @@ async function sendWarning(ctx, user, count, maxWarnings, reason) {
       0
     );
 
-  let message =
+  const message =
 `╭━━━━━━━━━━━━━━━━━━╮
-     ⚠️  USER WARNING
+       ⚠️  USER WARNING
 ╰━━━━━━━━━━━━━━━━━━╯
 
 👤 User: ${username}
+
 🔢 Warning: ${count}/${maxWarnings}
 
 🚫 Reason: ${reasonText}
 
 📌 Please follow the group rules.
+
 ⚠️ Remaining warnings: ${remaining}
 
 🛡️ GroupDefenders`;
 
-  await ctx.reply(message);
+  try {
+
+    await ctx.reply(
+      message
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Warning message error:",
+      error.message
+    );
+  }
 }
 
 /* =========================================
    ADD WARNING
 ========================================= */
 
-async function addWarning(ctx, reason) {
+async function addWarning(
+  ctx,
+  reason
+) {
 
-  const user = ctx.from;
+  const user =
+    ctx.from;
 
-  if (!user) return;
+  if (!user) {
+    return;
+  }
 
   const chatId =
     String(ctx.chat.id);
@@ -90,26 +194,16 @@ async function addWarning(ctx, reason) {
   const userId =
     String(user.id);
 
-  /* GET GROUP */
+  /* =======================================
+     GET GROUP
+  ======================================= */
 
   const group =
-    await Group.findOneAndUpdate(
-      { chatId },
+    await getGroup(ctx);
 
-      {
-        $setOnInsert: {
-          title:
-            ctx.chat.title || ""
-        }
-      },
-
-      {
-        upsert: true,
-        new: true
-      }
-    );
-
-  /* ADD WARNING */
+  /* =======================================
+     ADD WARNING
+  ======================================= */
 
   const warning =
     await Warning.findOneAndUpdate(
@@ -137,12 +231,17 @@ async function addWarning(ctx, reason) {
       }
     );
 
-  /* DELETE MESSAGE */
+  /* =======================================
+     DELETE VIOLATION MESSAGE
+  ======================================= */
 
   try {
+
     await ctx.deleteMessage();
+
   } catch (error) {
-    console.log(
+
+    console.error(
       "Message delete failed:",
       error.message
     );
@@ -161,9 +260,7 @@ async function addWarning(ctx, reason) {
 
       await ctx.telegram.restrictChatMember(
         ctx.chat.id,
-
         user.id,
-
         {
           permissions: {
             can_send_messages: false,
@@ -194,6 +291,16 @@ async function addWarning(ctx, reason) {
         user.username ||
         "User";
 
+      const isLink =
+        reason
+          .toLowerCase()
+          .includes("link");
+
+      const reasonText =
+        isLink
+          ? "🔗 Link Not Allowed"
+          : "🤬 Abusive Language";
+
       const muteMessage =
 `╭━━━━━━━━━━━━━━━━━━╮
        🔇  USER MUTED
@@ -204,11 +311,7 @@ async function addWarning(ctx, reason) {
 ⚠️ Warning limit reached:
 ${warning.count}/${group.maxWarnings}
 
-🚫 Reason: ${
-  reason.includes("Link")
-    ? "🔗 Link Not Allowed"
-    : "🤬 Abusive Language"
-}
+🚫 Reason: ${reasonText}
 
 🔇 Mute Duration:
 ${group.muteMinutes} minutes
@@ -219,13 +322,16 @@ ${group.muteMinutes} minutes
         muteMessage
       );
 
-      /* RESET WARNINGS */
+      /* ===================================
+         RESET WARNINGS
+      =================================== */
 
       await Warning.updateOne(
         {
           chatId,
           userId
         },
+
         {
           $set: {
             count: 0
@@ -285,119 +391,119 @@ ${warning.count}/${group.maxWarnings}
 
 function setupModeration(bot) {
 
-  bot.on("message", async (ctx) => {
+  bot.on(
+    "message",
+    async (ctx) => {
 
-    /* ONLY GROUPS */
+      try {
 
-    if (
-      !ctx.chat ||
-      ![
-        "group",
-        "supergroup"
-      ].includes(ctx.chat.type)
-    ) {
-      return;
-    }
+        /* =================================
+           ONLY GROUPS
+        ================================= */
 
-    /* IGNORE BOTS */
-
-    if (
-      !ctx.from ||
-      ctx.from.is_bot
-    ) {
-      return;
-    }
-
-    /* TEXT / CAPTION */
-
-    const text =
-      ctx.message.text ||
-      ctx.message.caption ||
-      "";
-
-    if (!text) return;
-
-    /* IGNORE ADMINS */
-
-    if (
-      await isAdmin(
-        ctx,
-        ctx.from.id
-      )
-    ) {
-      return;
-    }
-
-    /* GET GROUP SETTINGS */
-
-    const group =
-      await Group.findOneAndUpdate(
-        {
-          chatId:
-            String(ctx.chat.id)
-        },
-
-        {
-          $setOnInsert: {
-            title:
-              ctx.chat.title || "",
-
-            antiLink: true,
-
-            antiProfanity: true,
-
-            maxWarnings: 3,
-
-            muteMinutes: 60,
-
-            customWords: []
-          }
-        },
-
-        {
-          upsert: true,
-          new: true
+        if (
+          !ctx.chat ||
+          ![
+            "group",
+            "supergroup"
+          ].includes(
+            ctx.chat.type
+          )
+        ) {
+          return;
         }
-      );
 
-    /* =====================================
-       ANTI LINK
-    ===================================== */
+        /* =================================
+           IGNORE BOTS
+        ================================= */
 
-    if (
-      group.antiLink &&
-      URL_RE.test(text)
-    ) {
+        if (
+          !ctx.from ||
+          ctx.from.is_bot
+        ) {
+          return;
+        }
 
-      return addWarning(
-        ctx,
-        "🔗 Link not allowed"
-      );
-    }
+        /* =================================
+           IGNORE ADMINS
+        ================================= */
 
-    /* =====================================
-       ANTI PROFANITY
-    ===================================== */
+        if (
+          await isAdmin(
+            ctx,
+            ctx.from.id
+          )
+        ) {
+          return;
+        }
 
-    if (
-      group.antiProfanity
-    ) {
+        /* =================================
+           TEXT / CAPTION
+        ================================= */
 
-      const found =
-        containsProfanity(
-          text,
-          group.customWords
-        );
+        const text =
+          ctx.message.text ||
+          ctx.message.caption ||
+          "";
 
-      if (found) {
+        if (!text) {
+          return;
+        }
 
-        return addWarning(
-          ctx,
-          "🤬 Abusive language"
+        /* =================================
+           GET GROUP SETTINGS
+        ================================= */
+
+        const group =
+          await getGroup(ctx);
+
+        /* =================================
+           ANTI LINK
+        ================================= */
+
+        if (
+          group.antiLink &&
+          URL_RE.test(text)
+        ) {
+
+          return addWarning(
+            ctx,
+            "🔗 Link not allowed"
+          );
+        }
+
+        /* =================================
+           ANTI PROFANITY
+        ================================= */
+
+        if (
+          group.antiProfanity
+        ) {
+
+          const found =
+            containsProfanity(
+              text,
+              group.customWords || []
+            );
+
+          if (found) {
+
+            return addWarning(
+              ctx,
+              "🤬 Abusive language"
+            );
+          }
+        }
+
+      } catch (error) {
+
+        console.error(
+          "Moderation error:",
+          error.message
         );
       }
     }
-  });
+  );
 }
 
 /* =========================================
