@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const { setupCaptcha } = require("./handlers/captcha");
 const express = require("express");
 const { Telegraf } = require("telegraf");
 const { connectDB } = require("./database");
@@ -21,6 +21,7 @@ async function main() {
   setupCommands(bot);
   setupModeration(bot);
   setupAntiSpam(bot);
+  setupCaptcha(bot);
   const app = express();
   app.use(express.json());
 
