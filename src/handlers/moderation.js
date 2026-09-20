@@ -339,9 +339,15 @@ ${group.muteMinutes} minutes
 
 🛡️ GroupDefenders`;
 
-      await ctx.reply(
-        muteMessage
-      );
+      const sentMuteMessage = await ctx.reply(
+  muteMessage
+);
+
+deleteLater(
+  ctx,
+  sentMuteMessage,
+  10000
+);
 
       /* ===================================
          RESET WARNINGS
