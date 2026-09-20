@@ -174,16 +174,22 @@ async function sendWarning(
 
   try {
 
-    await ctx.reply(
-      message
-    );
+  const sentMessage = await ctx.reply(
+    message
+  );
 
-  } catch (error) {
+  deleteLater(
+    ctx,
+    sentMessage,
+    7000
+  );
 
-    console.error(
-      "Warning message error:",
-      error.message
-    );
+} catch (error) {
+
+  console.error(
+    "Warning message error:",
+    error.message
+  );
   }
 }
 
